@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import app.offlineplayer.data.AppDatabase
 import app.offlineplayer.data.Repository
+import app.offlineplayer.download.DownloaderUpdates
 import app.offlineplayer.downloader.Downloader
 import app.offlineplayer.downloader.YtDlpDownloader
 import kotlinx.coroutines.CoroutineScope
@@ -25,7 +26,10 @@ class App : Application() {
             NotificationChannel(CHANNEL_DOWNLOADS, "Downloads", NotificationManager.IMPORTANCE_LOW),
         )
         // Unpacking the bundled engine takes a few seconds on first launch; do it early.
-        container.appScope.launch { runCatching { container.downloader.initialize() } }
+        container.appScope.launch {
+            runCatching { container.downloader.initialize() }
+            runCatching { DownloaderUpdates.ensureFresh(this@App, DownloaderUpdates.DAY_MS) }
+        }
     }
 
     companion object {

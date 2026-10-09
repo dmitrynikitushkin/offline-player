@@ -54,4 +54,6 @@ class DownloadException(
     val reason: FailureReason,
     message: String,
     val retryable: Boolean = false,
+    /** The engine's own output (last lines), for the "Details" view. */
+    val details: String? = null,
 ) : Exception(message)

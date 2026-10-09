@@ -18,6 +18,7 @@ import app.offlineplayer.container
 import app.offlineplayer.data.Status
 import app.offlineplayer.downloader.DownloadException
 import app.offlineplayer.downloader.DownloadSpec
+import app.offlineplayer.downloader.FailureReason
 import app.offlineplayer.downloader.Progress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -51,8 +52,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             dao.setProgress(id, Status.DOWNLOADING, 0f, null)
 
             val latest = MutableStateFlow(Progress(0f, null))
-            try {
-                val output = coroutineScope {
+            val spec = DownloadSpec(id.toString(), item.url, item.mode, item.maxHeight)
+            suspend fun attempt() = coroutineScope {
                     val reporter = launch {
                         var last = -1f
                         while (isActive) {
@@ -66,12 +67,27 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                         }
                     }
                     try {
-                        c.downloader.download(
-                            DownloadSpec(id.toString(), item.url, item.mode, item.maxHeight),
-                            c.mediaDir,
-                        ) { latest.value = it }
+                        c.downloader.download(spec, c.mediaDir) { latest.value = it }
                     } finally {
                         reporter.cancel()
+                    }
+                }
+
+            try {
+                // An outdated engine is the usual cause of HTTP 403: keep it fresh.
+                runCatching { DownloaderUpdates.ensureFresh(applicationContext, DownloaderUpdates.DAY_MS) }
+                val output = try {
+                    attempt()
+                } catch (e: DownloadException) {
+                    val maybeStale = e.reason == FailureReason.BLOCKED || e.reason == FailureReason.UNKNOWN
+                    if (maybeStale && dao.get(id)?.status != Status.CANCELLED &&
+                        runCatching { DownloaderUpdates.ensureFresh(applicationContext, DownloaderUpdates.AFTER_FAILURE_MS) }
+                            .getOrDefault(false)
+                    ) {
+                        dao.setProgress(id, Status.DOWNLOADING, 0f, null)
+                        attempt() // engine was just updated: one automatic retry
+                    } else {
+                        throw e
                     }
                 }
                 val current = dao.get(id) ?: return@withLock Result.success() // deleted meanwhile
@@ -96,10 +112,17 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 }
                 throw e
             } catch (e: DownloadException) {
-                if (dao.get(id)?.status != Status.CANCELLED) dao.setStatus(id, Status.FAILED, e.message)
+                if (dao.get(id)?.status != Status.CANCELLED) {
+                    val version = c.downloader.version()?.let { "Downloader: yt-dlp $it\n" }.orEmpty()
+                    dao.setStatus(id, Status.FAILED, e.message, version + e.details.orEmpty())
+                }
                 Result.success() // failure is recorded on the item; Retry re-enqueues
             } catch (e: Exception) {
-                dao.setStatus(id, Status.FAILED, "Unexpected error: ${e.message ?: e.javaClass.simpleName}")
+                dao.setStatus(
+                    id, Status.FAILED,
+                    "Unexpected error: ${e.message ?: e.javaClass.simpleName}",
+                    e.stackTraceToString().take(4000),
+                )
                 Result.success()
             }
         }

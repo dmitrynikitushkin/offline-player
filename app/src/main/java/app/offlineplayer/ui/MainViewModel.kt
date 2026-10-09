@@ -14,6 +14,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import app.offlineplayer.container
 import app.offlineplayer.data.Item
+import app.offlineplayer.download.DownloaderUpdates
 import app.offlineplayer.downloader.DownloadException
 import app.offlineplayer.downloader.LinkParser
 import app.offlineplayer.downloader.MediaMode
@@ -21,6 +22,7 @@ import app.offlineplayer.downloader.ProbeResult
 import app.offlineplayer.playback.PlaybackService
 import app.offlineplayer.playback.isPlayableOffline
 import app.offlineplayer.playback.toMediaItem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -31,6 +33,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class Tab { LIBRARY, DOWNLOADS, PLAYER }
 
@@ -40,6 +43,7 @@ data class PasteState(
     val probing: Boolean = false,
     val probe: ProbeResult? = null,
     val error: String? = null,
+    val errorDetails: String? = null,
     val mode: MediaMode = MediaMode.VIDEO,
     val height: Int? = null,
 )
@@ -157,7 +161,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             ?: r.videoQualities.firstOrNull()?.height
                         paste.copy(probing = false, probe = r, height = defaultHeight)
                     } catch (e: DownloadException) {
-                        paste.copy(probing = false, error = e.message)
+                        paste.copy(probing = false, error = e.message, errorDetails = e.details)
                     } catch (e: kotlinx.coroutines.CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -192,13 +196,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _messages.send("Deleted “${item.title}”")
     }
 
+    /** yt-dlp version shown in the Library menu. */
+    var downloaderVersion by mutableStateOf<String?>(null)
+        private set
+
+    fun refreshDownloaderVersion() = viewModelScope.launch {
+        runCatching { c.downloader.initialize() }
+        downloaderVersion = withContext(Dispatchers.IO) { c.downloader.version() }
+    }
+
     fun updateDownloader() = viewModelScope.launch {
         _messages.send("Updating downloader…")
         val msg = try {
-            c.downloader.update()
+            DownloaderUpdates.updateNow(getApplication())
         } catch (e: Exception) {
             e.message ?: "Update failed"
         }
+        refreshDownloaderVersion()
         _messages.send(msg)
     }
 

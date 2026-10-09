@@ -39,8 +39,8 @@ class YtDlpDownloader(private val context: Context) : Downloader {
             addOption("--dump-single-json")
             addOption("--skip-download")
             addOption("--no-playlist")
-            addOption("--no-warnings")
             addOption("--socket-timeout", "30")
+            addJsChallengeOptions()
         }
         val json = try {
             runInterruptible(Dispatchers.IO) { YoutubeDL.getInstance().execute(req).out }
@@ -67,6 +67,7 @@ class YtDlpDownloader(private val context: Context) : Downloader {
             addOption("--retries", "5")
             addOption("--fragment-retries", "5")
             addOption("--embed-metadata")
+            addJsChallengeOptions()
             addOption("--write-thumbnail") // saved next to the media as <id>.jpg/.webp
             addOption("-o", "${outDir.absolutePath}/${spec.id}.%(ext)s")
             when (spec.mode) {
@@ -133,6 +134,16 @@ class YtDlpDownloader(private val context: Context) : Downloader {
     }
 
     override fun version(): String? = runCatching { YoutubeDL.getInstance().version(context) }.getOrNull()
+
+    /**
+     * YouTube serves a JavaScript challenge that must be solved or downloads get HTTP 403.
+     * youtubedl-android 0.18.1+ bundles QuickJS and passes --js-runtimes itself; the solver
+     * scripts ship inside yt-dlp. If the bundled scripts don't match the yt-dlp version,
+     * allow fetching the matching ones from GitHub.
+     */
+    private fun YoutubeDLRequest.addJsChallengeOptions() {
+        addOption("--remote-components", "ejs:github")
+    }
 
     private fun cleanup(dir: File, id: String) {
         dir.listFiles { f -> f.name.startsWith("$id.") }?.forEach { it.delete() }

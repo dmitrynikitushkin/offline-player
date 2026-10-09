@@ -42,7 +42,7 @@ class Repository(
 
     suspend fun cancel(id: Long) {
         // Mark first so the worker knows this was the user, not the system.
-        db.items().setStatus(id, Status.CANCELLED, null)
+        db.items().setStatus(id, Status.CANCELLED, null, null)
         DownloadWorker.cancel(context, id)
         downloader.cancel(id.toString())
     }

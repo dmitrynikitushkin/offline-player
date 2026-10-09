@@ -79,10 +79,19 @@ fun LibraryScreen(vm: MainViewModel) {
                 }
             }
             Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More") }
+                IconButton(onClick = { menu = true; vm.refreshDownloaderVersion() }) { Icon(Icons.Filled.MoreVert, "More") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
-                        text = { Text("Update downloader") },
+                        text = {
+                            Column {
+                                Text("Update downloader")
+                                Text(
+                                    "yt-dlp ${vm.downloaderVersion ?: "…"} · updates itself daily",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
                         leadingIcon = { Icon(Icons.Filled.SystemUpdate, null) },
                         onClick = { menu = false; vm.updateDownloader() },
                     )

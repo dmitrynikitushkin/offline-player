@@ -74,6 +74,7 @@ private fun DownloadRow(item: Item, onCancel: () -> Unit, onRetry: () -> Unit, o
                 Status.COMPLETED -> "Done" to MaterialTheme.colorScheme.onSurfaceVariant
             }
             Text(line, style = MaterialTheme.typography.bodySmall, color = color)
+            if (item.status == Status.FAILED) ErrorDetails(item.errorDetails)
             when (item.status) {
                 Status.DOWNLOADING -> {
                     Spacer(Modifier.height(6.dp))

@@ -15,17 +15,32 @@ android {
         applicationId = "app.offlineplayer"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // CI build number, so each new APK installs as an update over the previous one.
+        val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = build
+        versionName = "1.0.$build"
         // yt-dlp ships native Python/ffmpeg binaries per ABI.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
 
+    // One fixed key for every build (local and CI). Android only installs an update
+    // over an existing app if it is signed with the same key. This key is committed on
+    // purpose: it is as public as Android's standard debug key and only provides that
+    // update continuity for a personal, sideloaded app.
+    signingConfigs {
+        create("stable") {
+            storeFile = file("signing/offline-player.keystore")
+            storePassword = "offlineplayer"
+            keyAlias = "offlineplayer"
+            keyPassword = "offlineplayer"
+        }
+    }
+
     buildTypes {
+        debug { signingConfig = signingConfigs.getByName("stable") }
         release {
             isMinifyEnabled = false
-            // Personal sideloaded app: sign release with the debug key.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("stable")
         }
     }
 

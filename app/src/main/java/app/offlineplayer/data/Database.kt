@@ -14,6 +14,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import app.offlineplayer.downloader.MediaMode
 import kotlinx.coroutines.flow.Flow
 
@@ -32,6 +34,7 @@ data class Item(
     val progress: Float = 0f,
     val etaSec: Long? = null,
     val error: String? = null,
+    val errorDetails: String? = null,
     val filePath: String? = null,
     val thumbPath: String? = null,
     val fileSize: Long = 0,
@@ -85,10 +88,10 @@ interface ItemDao {
     @Query("UPDATE items SET status = :status, progress = :progress, etaSec = :eta WHERE id = :id")
     suspend fun setProgress(id: Long, status: Status, progress: Float, eta: Long?)
 
-    @Query("UPDATE items SET status = :status, error = :error WHERE id = :id")
-    suspend fun setStatus(id: Long, status: Status, error: String?)
+    @Query("UPDATE items SET status = :status, error = :error, errorDetails = :details WHERE id = :id")
+    suspend fun setStatus(id: Long, status: Status, error: String?, details: String?)
 
-    @Query("UPDATE items SET status = 'QUEUED', progress = 0, etaSec = NULL, error = NULL WHERE id = :id")
+    @Query("UPDATE items SET status = 'QUEUED', progress = 0, etaSec = NULL, error = NULL, errorDetails = NULL WHERE id = :id")
     suspend fun resetForRetry(id: Long)
 
     @Query("UPDATE items SET positionMs = :pos WHERE id = :id")
@@ -110,13 +113,21 @@ abstract class QueueDao {
     }
 }
 
-@Database(entities = [Item::class, QueueEntry::class], version = 1, exportSchema = false)
+@Database(entities = [Item::class, QueueEntry::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun items(): ItemDao
     abstract fun queue(): QueueDao
 
     companion object {
         fun build(context: Context) =
-            Room.databaseBuilder(context, AppDatabase::class.java, "offline-player.db").build()
+            Room.databaseBuilder(context, AppDatabase::class.java, "offline-player.db")
+                .addMigrations(MIGRATION_1_2)
+                .build()
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE items ADD COLUMN errorDetails TEXT")
+            }
+        }
     }
 }

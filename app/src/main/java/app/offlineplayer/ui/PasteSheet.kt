@@ -89,7 +89,10 @@ fun PasteSheet(vm: MainViewModel) {
                 keyboardActions = KeyboardActions(onGo = { vm.checkLink() }),
             )
 
-            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+            state.error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                ErrorDetails(state.errorDetails)
+            }
 
             when {
                 state.probing -> Row(verticalAlignment = Alignment.CenterVertically) {
