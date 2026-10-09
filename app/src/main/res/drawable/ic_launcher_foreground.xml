@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Play triangle over a "saved" tray: watch offline. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,34 L72,50 L46,66 Z" />
+    <path
+        android:fillColor="#7FB2FF"
+        android:pathData="M34,72 L74,72 L74,77 L34,77 Z" />
+</vector>
